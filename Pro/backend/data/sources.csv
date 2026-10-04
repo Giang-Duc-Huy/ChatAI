@@ -1,0 +1,5 @@
+doc_id,title,url_or_path,doc_type,year,published_date,version,status,license_note
+doc_01,Đề án tuyển sinh Đại học ABC 2025,de_an_tuyen_sinh_2025.txt,txt,2025,2025-03-01,2025.1,active,Tài liệu mẫu công khai cho demo MVP
+doc_02,Thông báo học phí và chỉ tiêu 2025,hoc_phi_chi_tieu_2025.txt,txt,2025,2025-03-15,2025.1,active,Tài liệu mẫu công khai cho demo MVP
+doc_03,Phương thức xét tuyển Đại học ABC 2025,phuong_thuc_xet_tuyen_2025.txt,txt,2025,2025-02-20,2025.1,active,Tài liệu mẫu công khai cho demo MVP
+doc_04,Đề án tuyển sinh Đại học ABC 2024,de_an_tuyen_sinh_2024.txt,txt,2024,2024-03-01,2024.1,superseded,Bản cũ – đã được thay bằng 2025
