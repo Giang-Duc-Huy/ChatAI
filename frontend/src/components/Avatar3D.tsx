@@ -1,5 +1,7 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { AvatarState, VisemeFrame } from "../types";
 import { visemeAt } from "../lib/viseme";
 
@@ -9,19 +11,33 @@ type Props = {
   timelineRef: MutableRefObject<VisemeFrame[]>;
   clock0Ref: MutableRefObject<number>;
   onMouthInfo: (info: string) => void;
+  onModelStatus: (status: string) => void;
 };
 
-export function Avatar3D({ state, playingRef, timelineRef, clock0Ref, onMouthInfo }: Props) {
+const AVATAR_URL = new URL("../../Model.vrm", import.meta.url).href;
+const MOUTH_EXPRESSIONS = ["aa", "ee", "ih", "oh", "ou"] as const;
+
+export function Avatar3D({
+  state,
+  playingRef,
+  timelineRef,
+  clock0Ref,
+  onMouthInfo,
+  onModelStatus,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
   const onMouthRef = useRef(onMouthInfo);
+  const onModelStatusRef = useRef(onModelStatus);
   stateRef.current = state;
   onMouthRef.current = onMouthInfo;
+  onModelStatusRef.current = onModelStatus;
 
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
 
+    onModelStatusRef.current("Đang tải nhân vật VRM…");
     const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
     const sc = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
@@ -79,6 +95,52 @@ export function Avatar3D({ state, playingRef, timelineRef, clock0Ref, onMouthInf
     mouth.scale.set(1, 0.12, 0.4);
     head.add(mouth);
 
+    const loader = new GLTFLoader();
+    loader.register((parser) => new VRMLoaderPlugin(parser));
+    const vrmRef: { current: VRM | null } = { current: null };
+    let disposed = false;
+    void loader
+      .loadAsync(AVATAR_URL)
+      .then((gltf) => {
+        const loadedVrm = gltf.userData.vrm as VRM | undefined;
+        if (!loadedVrm) {
+          VRMUtils.deepDispose(gltf.scene);
+          throw new Error("Tệp không chứa nhân vật VRM hợp lệ.");
+        }
+        if (disposed) {
+          VRMUtils.deepDispose(loadedVrm.scene);
+          return;
+        }
+        loadedVrm.scene.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(loadedVrm.scene);
+        const height = bounds.getSize(new THREE.Vector3()).y;
+        if (!Number.isFinite(height) || height <= 0) {
+          VRMUtils.deepDispose(loadedVrm.scene);
+          throw new Error("Không xác định được kích thước nhân vật VRM.");
+        }
+        const scale = 2.25 / height;
+        loadedVrm.scene.scale.setScalar(scale);
+        loadedVrm.scene.position.y = -bounds.min.y * scale;
+        const leftUpperArm = loadedVrm.humanoid.getNormalizedBoneNode("leftUpperArm");
+        const rightUpperArm = loadedVrm.humanoid.getNormalizedBoneNode("rightUpperArm");
+        const leftLowerArm = loadedVrm.humanoid.getNormalizedBoneNode("leftLowerArm");
+        const rightLowerArm = loadedVrm.humanoid.getNormalizedBoneNode("rightLowerArm");
+        if (leftUpperArm) leftUpperArm.rotation.z = -1.1;
+        if (rightUpperArm) rightUpperArm.rotation.z = 1.1;
+        if (leftLowerArm) leftLowerArm.rotation.z = -0.12;
+        if (rightLowerArm) rightLowerArm.rotation.z = 0.12;
+        sc.add(loadedVrm.scene);
+        av.visible = false;
+        vrmRef.current = loadedVrm;
+        onModelStatusRef.current("Đã tải nhân vật VRM · Model: superlitgirl, tác giả superlit");
+      })
+      .catch((error: unknown) => {
+        if (!disposed) {
+          const message = error instanceof Error ? error.message : String(error);
+          onModelStatusRef.current(`Không tải được VRM; đang dùng nhân vật dự phòng. ${message}`);
+        }
+      });
+
     const size = () => {
       const w = cv.clientWidth;
       const h = cv.clientHeight;
@@ -100,20 +162,34 @@ export function Avatar3D({ state, playingRef, timelineRef, clock0Ref, onMouthInf
 
     const frame = () => {
       raf = requestAnimationFrame(frame);
-      const t = clk.getElapsedTime();
+      const delta = clk.getDelta();
+      const t = clk.elapsedTime;
       let target = { o: 0.1, w: 1 };
       let nm = "nghỉ";
+      let expression: (typeof MOUTH_EXPRESSIONS)[number] | null = null;
       if (playingRef.current) {
         const v = visemeAt(timelineRef.current, (performance.now() - clock0Ref.current) / 1000);
         if (v) {
           target = v;
           nm = v.name || "đóng";
+          expression = MOUTH_EXPRESSIONS.find((name) => name === v.name) ?? null;
         }
       }
       mo += (target.o - mo) * 0.45;
       mw += (target.w - mw) * 0.4;
-      mouth.scale.set(mw, 0.1 + mo * 0.9, 0.4);
-      mouth.position.y = -0.28 - mo * 0.03;
+      const vrm = vrmRef.current;
+      if (vrm) {
+        const expressions = vrm.expressionManager;
+        if (expressions) {
+          for (const name of MOUTH_EXPRESSIONS) {
+            expressions.setValue(name, name === expression ? mo : 0);
+          }
+          expressions.setValue("blink", Math.sin(blink * Math.PI) * 0.95);
+        }
+      } else {
+        mouth.scale.set(mw, 0.1 + mo * 0.9, 0.4);
+        mouth.position.y = -0.28 - mo * 0.03;
+      }
       const info = playingRef.current ? "Viseme: " + nm : "";
       if (info !== lastMouth) {
         lastMouth = info;
@@ -133,8 +209,12 @@ export function Avatar3D({ state, playingRef, timelineRef, clock0Ref, onMouthInf
         ry = Math.sin(t * 2.2) * 0.07;
         rx = Math.sin(t * 3) * 0.03;
       }
-      head.rotation.y += (ry - head.rotation.y) * 0.1;
-      head.rotation.x += (rx - head.rotation.x) * 0.1;
+      if (vrm) {
+        vrm.scene.rotation.y += (ry - vrm.scene.rotation.y) * 0.1;
+      } else {
+        head.rotation.y += (ry - head.rotation.y) * 0.1;
+        head.rotation.x += (rx - head.rotation.x) * 0.1;
+      }
       av.position.y = Math.sin(t * 1.6) * 0.015;
       if (t > nextBlink) {
         blink = 1;
@@ -148,13 +228,16 @@ export function Avatar3D({ state, playingRef, timelineRef, clock0Ref, onMouthInf
       brow.forEach((b) => {
         b.position.y = 0.27 + (st === "Nghĩ" ? 0.05 : 0) + mo * 0.02;
       });
+      vrm?.update(delta);
       R.render(sc, cam);
     };
     frame();
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       removeEventListener("resize", size);
+      if (vrmRef.current) VRMUtils.deepDispose(vrmRef.current.scene);
       sc.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry.dispose();

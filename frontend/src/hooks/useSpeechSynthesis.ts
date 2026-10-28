@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AvatarState, VisemeFrame } from "../types";
 import { buildTimeline } from "../lib/viseme";
+import { postTts } from "../api/client";
 
 type Options = {
   rate: number;
@@ -15,6 +16,8 @@ export function useSpeechSynthesis({ rate, onState }: Options) {
   const curText = useRef("");
   const fallbackTimer = useRef(0);
   const genRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef("");
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const rateRef = useRef(rate);
   const onStateRef = useRef(onState);
@@ -41,7 +44,12 @@ export function useSpeechSynthesis({ rate, onState }: Options) {
   };
 
   const stop = useCallback(() => {
+    genRef.current++;
     if ("speechSynthesis" in window) speechSynthesis.cancel();
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = "";
     window.clearTimeout(fallbackTimer.current);
     markPlaying(false);
     onStateRef.current("Chờ");
@@ -56,34 +64,38 @@ export function useSpeechSynthesis({ rate, onState }: Options) {
 
   const speak = useCallback(
     (text: string) => {
-      const gen = ++genRef.current;
       stop();
+      const gen = genRef.current;
       curText.current = text;
       const r = rateRef.current || 1;
       const clean = text.replace(/\[[^\]]*\]/g, "").replace(/\s+/g, " ").trim();
       const tl = buildTimeline(clean, r);
-      const u = new SpeechSynthesisUtterance(clean);
-      u.lang = "vi-VN";
-      u.rate = r;
-      if (voiceRef.current) u.voice = voiceRef.current;
-      u.onstart = () => {
-        if (gen !== genRef.current) return;
-        begin(tl);
-      };
-      u.onboundary = (ev) => {
-        if (gen !== genRef.current) return;
-        const s = tl.find((x) => x.ci >= ev.charIndex);
-        if (s) clock0Ref.current = performance.now() - s.t0 * 1000;
-      };
+      let browserStarted = false;
       const done = () => {
         if (gen !== genRef.current) return;
         markPlaying(false);
         onStateRef.current("Chờ");
+        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = "";
+        audioRef.current = null;
       };
-      u.onend = done;
-      u.onerror = done;
-      const start = () => {
-        if (gen !== genRef.current) return;
+      const speakInBrowser = () => {
+        if (gen !== genRef.current || browserStarted) return;
+        browserStarted = true;
+        const u = new SpeechSynthesisUtterance(clean);
+        u.lang = "vi-VN";
+        u.rate = r;
+        if (voiceRef.current) u.voice = voiceRef.current;
+        u.onstart = () => {
+          if (gen === genRef.current) begin(tl);
+        };
+        u.onboundary = (ev) => {
+          if (gen !== genRef.current) return;
+          const s = tl.find((x) => x.ci >= ev.charIndex);
+          if (s) clock0Ref.current = performance.now() - s.t0 * 1000;
+        };
+        u.onend = done;
+        u.onerror = done;
         if (!("speechSynthesis" in window) || !voiceRef.current) {
           begin(tl);
           const total = tl.length ? tl[tl.length - 1].t1 : 1;
@@ -93,7 +105,49 @@ export function useSpeechSynthesis({ rate, onState }: Options) {
         }
         speechSynthesis.speak(u);
       };
-      window.setTimeout(start, 0);
+
+      void postTts(clean)
+        .then((result) => {
+          if (gen !== genRef.current) return;
+          const binary = atob(result.audio_b64);
+          const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+          const blob = new Blob([bytes], { type: result.mime });
+          audioUrlRef.current = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrlRef.current);
+          audioRef.current = audio;
+          const serverTimeline: VisemeFrame[] = result.visemes.map((frame) => ({
+            ...frame,
+            v: frame.viseme,
+            ci: 0,
+          }));
+          timelineRef.current = serverTimeline;
+          audio.onplay = () => {
+            clock0Ref.current = performance.now() - audio.currentTime * 1000;
+            markPlaying(true);
+            onStateRef.current("Nói");
+          };
+          audio.ontimeupdate = () => {
+            clock0Ref.current = performance.now() - audio.currentTime * 1000;
+          };
+          audio.onended = done;
+          audio.onerror = () => {
+            if (gen !== genRef.current) return;
+            audioRef.current = null;
+            if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+            audioUrlRef.current = "";
+            speakInBrowser();
+          };
+          void audio.play().catch(() => {
+            if (gen !== genRef.current) return;
+            audioRef.current = null;
+            if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+            audioUrlRef.current = "";
+            speakInBrowser();
+          });
+        })
+        .catch(() => {
+          speakInBrowser();
+        });
     },
     [stop],
   );

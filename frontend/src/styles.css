@@ -147,6 +147,9 @@ button.rec {
   border-top: 1px dashed var(--bd);
   padding-top: 4px;
 }
+.src a {
+  color: var(--ac);
+}
 #q {
   flex: 1;
   min-width: 0;

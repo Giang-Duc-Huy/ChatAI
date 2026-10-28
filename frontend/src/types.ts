@@ -4,6 +4,7 @@ export type SourceRef = {
   doc: string;
   section: string;
   date: string;
+  url?: string;
 };
 
 export type ChatMessage = {
@@ -24,7 +25,7 @@ export type DocChunk = {
 
 export type ChatResponse = {
   answer: string;
-  sources: { doc_title: string; section: string; date: string; score: number }[];
+  sources: { doc_title: string; section: string; date: string; score: number; url?: string }[];
   latency: { retrieval?: number; llm?: number; total?: number };
 };
 

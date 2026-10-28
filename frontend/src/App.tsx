@@ -14,6 +14,7 @@ const nextId = () => String(++msgId);
 export default function App() {
   const [avatarState, setAvatarState] = useState<AvatarState>("Chờ");
   const [mouthInfo, setMouthInfo] = useState("");
+  const [modelStatus, setModelStatus] = useState("Đang tải nhân vật VRM…");
   const [indexStatus, setIndexStatus] = useState(
     "Đang dùng chỉ mục tuyển sinh trên máy chủ. Tài liệu bạn tải lên chỉ được xử lý trong phiên trình duyệt này.",
   );
@@ -79,6 +80,7 @@ export default function App() {
               doc: s.doc_title,
               section: s.section,
               date: s.date,
+              url: s.url,
             })),
           });
           speak(a.answer);
@@ -130,6 +132,7 @@ export default function App() {
           timelineRef={timelineRef}
           clock0Ref={clock0Ref}
           onMouthInfo={setMouthInfo}
+          onModelStatus={setModelStatus}
         />
         <span className="status-pill">{avatarState}</span>
         <div className="row">
@@ -142,6 +145,9 @@ export default function App() {
           >
             Nghe thử khẩu hình
           </button>
+        </div>
+        <div className="mu" style={{ marginTop: 6 }}>
+          {modelStatus}
         </div>
         <div className="mu" style={{ marginTop: 6 }}>
           {mouthInfo}

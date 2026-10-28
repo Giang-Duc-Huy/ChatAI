@@ -8,6 +8,13 @@ from .chunk import chunk
 
 def main():
     rows = load_catalog()
+    if not rows:
+        print("Không có dữ liệu trong data/raw/")
+        return
+
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(EMBEDDING_MODEL)
+
     # tài liệu cùng group: bản có effective_date mới nhất giữ lại, bản cũ -> superseded
     groups = defaultdict(list)
     for r in rows:
@@ -20,19 +27,18 @@ def main():
     ids, docs, metas = [], [], []
     for r in rows:
         text = clean(read_file(DATA_RAW / r["file"]))
-        for n, (section, piece) in enumerate(chunk(text)):
+        for n, (section, piece, page) in enumerate(chunk(text, model.tokenizer)):
             ids.append(f"{r['file']}::{n}")
             docs.append(piece)
             metas.append({"chunk_id": ids[-1], "doc_title": r["doc_title"], "source": r["source"],
+                          "official_url": r.get("official_url", ""),
                           "version": r["version"], "date": r["date"], "effective_date": r["effective_date"],
-                          "section": section, "superseded": r["superseded"]})
+                          "section": section, "page": page, "superseded": r["superseded"]})
     print(f"{len(rows)} tài liệu -> {len(docs)} đoạn")
     if not docs:
         print("Không có dữ liệu trong data/raw/"); return
 
     import chromadb
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(EMBEDDING_MODEL)
     client = chromadb.PersistentClient(path=str(INDEX_DIR))
     try:
         client.delete_collection("tuyensinh")
