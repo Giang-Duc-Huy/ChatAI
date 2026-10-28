@@ -107,6 +107,10 @@ button.p {
   border-color: var(--ac);
   color: #fff;
 }
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 button.rec {
   background: #d92d20;
   border-color: #d92d20;
@@ -139,6 +143,34 @@ button.rec {
 }
 .m.b {
   background: var(--bot);
+}
+.message-meta {
+  margin-top: 5px;
+  color: var(--mu);
+  font-size: 12px;
+}
+.thinking {
+  color: var(--mu);
+}
+.loading-dots {
+  display: inline-block;
+  width: 1.5em;
+  overflow: hidden;
+  vertical-align: bottom;
+  animation: loading-dots 1.2s steps(4, end) infinite;
+}
+@keyframes loading-dots {
+  from {
+    width: 0;
+  }
+  to {
+    width: 1.5em;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-dots {
+    animation: none;
+  }
 }
 .src {
   font-size: 12px;

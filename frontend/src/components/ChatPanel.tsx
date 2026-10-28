@@ -5,13 +5,12 @@ import { MicButton } from "./MicButton";
 import { SettingsBar } from "./SettingsBar";
 
 type Props = {
-  indexStatus: string;
   messages: ChatMessage[];
+  isThinking: boolean;
   listening: boolean;
   topK: number;
   minScore: number;
   rate: number;
-  onFiles: (files: FileList) => void;
   onAsk: (q: string) => void;
   onMic: () => void;
   onTopK: (n: number) => void;
@@ -20,13 +19,12 @@ type Props = {
 };
 
 export function ChatPanel({
-  indexStatus,
   messages,
+  isThinking,
   listening,
   topK,
   minScore,
   rate,
-  onFiles,
   onAsk,
   onMic,
   onTopK,
@@ -36,42 +34,34 @@ export function ChatPanel({
   const [q, setQ] = useState("");
 
   const send = () => {
-    const text = q;
+    const text = q.trim();
+    if (!text || isThinking) return;
     setQ("");
     onAsk(text);
   };
 
   return (
     <section className="card">
-      <div className="row" style={{ margin: "0 0 8px", alignItems: "center" }}>
-        <label className="mu">
-          Tài liệu riêng cho phiên này (PDF, HTML hoặc TXT):{" "}
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.html,.htm,.txt"
-            onChange={(e) => e.target.files && onFiles(e.target.files)}
-          />
-        </label>
-      </div>
-      <div className="mu">Tài liệu không được gửi lên máy chủ; khi tải tài liệu, câu hỏi chỉ dùng bộ tài liệu này.</div>
-      <div className="mu">{indexStatus}</div>
-      <MessageList messages={messages} />
+      <MessageList messages={messages} isThinking={isThinking} />
       <div className="row">
         <input
           id="q"
           placeholder="Hỏi về tuyển sinh…"
           autoComplete="off"
+          maxLength={1000}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") send();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              send();
+            }
           }}
         />
-        <button className="p" onClick={send}>
+        <button className="p" onClick={send} disabled={isThinking || !q.trim()}>
           Gửi
         </button>
-        <MicButton listening={listening} onClick={onMic} />
+        <MicButton listening={listening} disabled={isThinking} onClick={onMic} />
       </div>
       <SettingsBar
         topK={topK}

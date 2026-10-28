@@ -10,7 +10,6 @@ type Props = {
   playingRef: MutableRefObject<boolean>;
   timelineRef: MutableRefObject<VisemeFrame[]>;
   clock0Ref: MutableRefObject<number>;
-  onMouthInfo: (info: string) => void;
   onModelStatus: (status: string) => void;
 };
 
@@ -22,22 +21,18 @@ export function Avatar3D({
   playingRef,
   timelineRef,
   clock0Ref,
-  onMouthInfo,
   onModelStatus,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
-  const onMouthRef = useRef(onMouthInfo);
   const onModelStatusRef = useRef(onModelStatus);
   stateRef.current = state;
-  onMouthRef.current = onMouthInfo;
   onModelStatusRef.current = onModelStatus;
 
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
 
-    onModelStatusRef.current("Đang tải nhân vật VRM…");
     const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
     const sc = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
@@ -50,6 +45,7 @@ export function Avatar3D({
 
     const mat = (c: number) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
     const av = new THREE.Group();
+    av.visible = false;
     sc.add(av);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.85, 1.3, 32), mat(0x2f6df6));
     body.position.y = -0.1;
@@ -130,12 +126,11 @@ export function Avatar3D({
         if (leftLowerArm) leftLowerArm.rotation.z = -0.12;
         if (rightLowerArm) rightLowerArm.rotation.z = 0.12;
         sc.add(loadedVrm.scene);
-        av.visible = false;
         vrmRef.current = loadedVrm;
-        onModelStatusRef.current("Đã tải nhân vật VRM · Model: superlitgirl, tác giả superlit");
       })
       .catch((error: unknown) => {
         if (!disposed) {
+          av.visible = true;
           const message = error instanceof Error ? error.message : String(error);
           onModelStatusRef.current(`Không tải được VRM; đang dùng nhân vật dự phòng. ${message}`);
         }
@@ -156,7 +151,6 @@ export function Avatar3D({
     let mw = 1;
     let nextBlink = 2;
     let blink = 0;
-    let lastMouth = "";
     const clk = new THREE.Clock();
     let raf = 0;
 
@@ -165,13 +159,11 @@ export function Avatar3D({
       const delta = clk.getDelta();
       const t = clk.elapsedTime;
       let target = { o: 0.1, w: 1 };
-      let nm = "nghỉ";
       let expression: (typeof MOUTH_EXPRESSIONS)[number] | null = null;
       if (playingRef.current) {
         const v = visemeAt(timelineRef.current, (performance.now() - clock0Ref.current) / 1000);
         if (v) {
           target = v;
-          nm = v.name || "đóng";
           expression = MOUTH_EXPRESSIONS.find((name) => name === v.name) ?? null;
         }
       }
@@ -190,12 +182,6 @@ export function Avatar3D({
         mouth.scale.set(mw, 0.1 + mo * 0.9, 0.4);
         mouth.position.y = -0.28 - mo * 0.03;
       }
-      const info = playingRef.current ? "Viseme: " + nm : "";
-      if (info !== lastMouth) {
-        lastMouth = info;
-        onMouthRef.current(info);
-      }
-
       const sway = Math.sin(t * 1.2) * 0.04;
       let ry = sway;
       let rx = 0;

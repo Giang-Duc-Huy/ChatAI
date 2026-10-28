@@ -20,3 +20,9 @@
 {"ts": "2026-10-28T00:13:23", "stage": "tts", "latency_ms": {"tts": 5906.6, "total": 5906.6}}
 {"ts": "2026-10-28T00:20:40", "latency_ms": {"retrieval": 56009.2, "llm": 8295.4, "total": 64304.7}, "cost": {"in": 2989, "out": 23, "usd": null}, "sufficient": true}
 {"ts": "2026-10-28T00:20:47", "stage": "tts", "latency_ms": {"tts": 6451.0, "total": 6451.1}}
+{"ts": "2026-10-28T20:07:05", "latency_ms": {"retrieval": 161844.5, "llm": 6959.8, "total": 168804.4}, "cost": {"in": 2801, "out": 23, "usd": null}, "sufficient": true}
+{"ts": "2026-10-28T23:28:40", "latency_ms": {"retrieval": 1546.2, "llm": 3057.9, "total": 4604.3}, "cost": {"in": 3415, "out": 55, "usd": null}, "sufficient": true}
+{"ts": "2026-10-28T23:28:53", "stage": "tts", "latency_ms": {"tts": 13243.7, "total": 13243.7}}
+{"ts": "2026-10-28T23:29:02", "latency_ms": {"retrieval": 625.4, "llm": 3669.3, "total": 4294.8}, "cost": {"in": 2733, "out": 21, "usd": null}, "sufficient": true}
+{"ts": "2026-10-28T23:29:09", "stage": "tts", "latency_ms": {"tts": 7535.5, "total": 7535.5}}
+{"ts": "2026-10-28T23:35:34", "latency_ms": {"retrieval": 494.5, "llm": 4278.5, "total": 4773.1}, "cost": {"in": 3978, "out": 30, "usd": null}, "sufficient": true}

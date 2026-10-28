@@ -1,9 +1,11 @@
 import unicodedata
 import math
 import re
+from threading import Lock
 from ..config import EMBEDDING_MODEL, INDEX_DIR, TOP_K, MIN_SCORE
 
 _model = _col = None
+_load_lock = Lock()
 _BM25_WEIGHT = 0.6
 RETRIEVAL_PROFILE = (
     f"hybrid_bm25_{int(_BM25_WEIGHT * 100)}_dense_{int((1 - _BM25_WEIGHT) * 100)}_intent_rerank"
@@ -20,11 +22,17 @@ _INTENT_PHRASES = (
 def _load():
     global _model, _col
     if _col is None:
-        import chromadb
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(EMBEDDING_MODEL)
-        _col = chromadb.PersistentClient(path=str(INDEX_DIR)).get_collection("tuyensinh")
+        with _load_lock:
+            if _col is None:
+                import chromadb
+                from sentence_transformers import SentenceTransformer
+                model = SentenceTransformer(EMBEDDING_MODEL)
+                col = chromadb.PersistentClient(path=str(INDEX_DIR)).get_collection("tuyensinh")
+                _model, _col = model, col
     return _model, _col
+
+def warm():
+    _load()
 
 def _tokens(text: str):
     words = [

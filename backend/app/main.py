@@ -1,4 +1,5 @@
-import time, collections, unicodedata
+import time, collections, unicodedata, logging
+from threading import Thread
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 from . import config, latency
 from .latency import Timer
 
+logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Trợ lý ảo 3D tuyển sinh",
     description=(
@@ -36,6 +38,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 _hits = collections.defaultdict(collections.deque)
+
+def _warm_retriever():
+    try:
+        from .rag.retriever import warm
+        warm()
+    except Exception:
+        logger.exception("Không thể khởi tạo trước mô hình truy xuất RAG.")
+
+@app.on_event("startup")
+def warm_rag_in_background():
+    Thread(target=_warm_retriever, name="rag-warmup", daemon=True).start()
 
 def rate_limit(request: Request):
     ip, now = request.client.host, time.time()
@@ -143,6 +156,12 @@ def chat(body: ChatIn, request: Request):
         with t.stage("llm"):
             answer, cost = generate(question, chunks, ok)
     except Exception as e:
+        if getattr(e, "code", None) in {429, 500, 502, 503, 504}:
+            raise HTTPException(
+                503,
+                "Dịch vụ AI đang quá tải hoặc tạm thời không khả dụng. "
+                "Bạn vui lòng thử gửi lại sau ít phút.",
+            ) from e
         raise HTTPException(502, f"Lỗi xử lý: {e}")
     lat = t.total()
     sources = [{"doc_title": c["doc_title"], "section": c["section"], "date": c["effective_date"] or c["date"],

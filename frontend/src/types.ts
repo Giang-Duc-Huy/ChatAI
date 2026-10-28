@@ -11,16 +11,8 @@ export type ChatMessage = {
   id: string;
   role: "user" | "bot";
   text: string;
+  meta?: string;
   sources?: SourceRef[];
-};
-
-export type DocChunk = {
-  doc: string;
-  date: string;
-  section: string;
-  text: string;
-  tf: Record<string, number>;
-  toks: string[];
 };
 
 export type ChatResponse = {

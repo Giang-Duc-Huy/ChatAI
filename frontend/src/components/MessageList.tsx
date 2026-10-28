@@ -1,7 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../types";
 
-export function MessageList({ messages }: { messages: ChatMessage[] }) {
+export function MessageList({
+  messages,
+  isThinking,
+}: {
+  messages: ChatMessage[];
+  isThinking: boolean;
+}) {
   const logRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = logRef.current;
@@ -13,6 +19,7 @@ export function MessageList({ messages }: { messages: ChatMessage[] }) {
       {messages.map((m) => (
         <div key={m.id} className={`m ${m.role === "user" ? "u" : "b"}`}>
           {m.text}
+          {m.meta && <div className="message-meta">{m.meta}</div>}
           {m.sources && m.sources.length > 0 && (
             <div className="src">
               Nguồn:{" "}
@@ -37,6 +44,12 @@ export function MessageList({ messages }: { messages: ChatMessage[] }) {
           )}
         </div>
       ))}
+      {isThinking && (
+        <div className="m b thinking" role="status" aria-live="polite">
+          Đang tra cứu tài liệu và soạn câu trả lời
+          <span className="loading-dots" aria-hidden="true">...</span>
+        </div>
+      )}
     </div>
   );
 }
